@@ -18,15 +18,44 @@ def evaluate_policy_singlestep(model, env, datamodule, args, checkpoint):
     val_annotations = OmegaConf.load(conf_dir / "annotations/new_playtable_validation.yaml")
 
     task_to_id_dict = torch.load(checkpoint)["task_to_id_dict"]
+    
     dataset = datamodule.val_dataloader().dataset.datasets["vis"]
 
     results = Counter()
 
-    for task, ids in task_to_id_dict.items():
+    for the baseline
+    for task, ids in task_to_id_dict.items(): 
         for i in ids:
             episode = dataset[int(i)]
             results[task] += rollout(env, model, episode, task_oracle, args, task, val_annotations)
         print(f"{task}: {results[task]} / {len(ids)}")
+
+
+    
+    #Changes of the MCIL
+    #for task, ids in task_to_id_dict.items(): 
+    #    evaluated = 0  # count how many episodes we can actually evaluate
+    #    for i in ids:
+    #        if int(i) >= len(dataset):
+    #            continue  # skip indices not in debug dataset
+    #        episode = dataset[int(i)]
+    #        results[task] += rollout(env, model, episode, task_oracle, args, task, val_annotations)
+    #        evaluated += 1
+    #    print(f"{task}: {results[task]} / {evaluated} evaluated (out of {len(ids)} total)")
+
+
+    # Build task_to_id_dict dynamically from the debug dataset
+    #for task, ids in task_to_id_dict.items(): 
+    #evaluated = 0
+    #    for i in ids:
+    #        if int(i) >= len(dataset):
+    #            continue
+    #        episode = dataset[int(i)]
+    #        results[task] += rollout(env, model, episode, task_oracle, args, task, val_annotations)
+    #        evaluated += 1
+    #    print(f"{task}: {results[task]} / {evaluated} evaluated (out of {len(ids)} total)")
+
+
 
     print(f"SR: {sum(results.values()) / sum(len(x) for x in task_to_id_dict.values()) * 100:.1f}%")
 
