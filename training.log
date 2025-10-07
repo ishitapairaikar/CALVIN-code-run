@@ -1,0 +1,744 @@
+[2025-10-05 13:03:12,376][calvin_agent.models.decoders.logistic_policy_network][INFO] - Loaded action bounds from /home/calvin/dataset/calvin_debug_dataset/training/statistics.yaml
+[2025-10-05 13:03:12,386][__main__][INFO] - Training with the following config:
+callbacks:
+  checkpoint:
+    _target_: pytorch_lightning.callbacks.ModelCheckpoint
+    save_top_k: -1
+    verbose: true
+    dirpath: saved_models
+    filename: '{epoch}'
+  tsne_plot:
+    _target_: calvin_agent.visualization.tsne_plot.TSNEPlot
+    perplexity: 40
+    n_jobs: 8
+    plot_percentage: 0.2
+    opacity: 0.3
+    marker_size: 5
+  kl_schedule:
+    _target_: calvin_agent.utils.kl_callbacks.KLConstantSchedule
+datamodule:
+  datasets:
+    vision_dataset:
+      _target_: calvin_agent.datasets.shm_dataset.ShmDataset
+      key: vis
+      batch_size: 32
+      min_window_size: 16
+      max_window_size: 32
+      proprio_state: ${datamodule.proprioception_dims}
+      obs_space: ${datamodule.observation_space}
+      pad: true
+      lang_folder: lang_annotations
+      num_workers: 2
+    lang_dataset:
+      _target_: calvin_agent.datasets.shm_dataset.ShmDataset
+      key: lang
+      batch_size: 32
+      min_window_size: 16
+      max_window_size: 32
+      proprio_state: ${datamodule.proprioception_dims}
+      obs_space: ${datamodule.observation_space}
+      pad: true
+      lang_folder: lang_annotations
+      num_workers: 2
+  transforms:
+    train:
+      rgb_static:
+      - _target_: torchvision.transforms.Resize
+        size: 200
+      - _target_: calvin_agent.utils.transforms.ScaleImageTensor
+      - _target_: torchvision.transforms.Normalize
+        mean:
+        - 0.5
+        std:
+        - 0.5
+      - _target_: calvin_agent.utils.transforms.AddGaussianNoise
+        mean:
+        - 0.0
+        std:
+        - 0.01
+      rgb_gripper:
+      - _target_: torchvision.transforms.Resize
+        size: 84
+      - _target_: calvin_agent.utils.transforms.ScaleImageTensor
+      - _target_: torchvision.transforms.Normalize
+        mean:
+        - 0.5
+        std:
+        - 0.5
+      - _target_: calvin_agent.utils.transforms.AddGaussianNoise
+        mean:
+        - 0.0
+        std:
+        - 0.01
+      depth_static:
+      - _target_: torchvision.transforms.Resize
+        size: 200
+      - _target_: calvin_agent.utils.transforms.AddDepthNoise
+        shape:
+        - 1000.0
+        rate:
+        - 1000.0
+      - _target_: calvin_agent.utils.transforms.AddGaussianNoise
+        mean:
+        - 0.0
+        std:
+        - 0.01
+      depth_gripper:
+      - _target_: torchvision.transforms.Resize
+        size: 84
+      - _target_: calvin_agent.utils.transforms.AddGaussianNoise
+        mean:
+        - 0.0
+        std:
+        - 0.01
+      rgb_tactile:
+      - _target_: torchvision.transforms.Resize
+        size: 70
+      - _target_: torchvision.transforms.RandomCrop
+        size: 64
+      - _target_: calvin_agent.utils.transforms.ScaleImageTensor
+      - _target_: torchvision.transforms.Normalize
+        mean:
+        - 0.5
+        std:
+        - 0.5
+      - _target_: calvin_agent.utils.transforms.AddGaussianNoise
+        mean:
+        - 0.0
+        std:
+        - 0.01
+      depth_tactile:
+      - _target_: torchvision.transforms.Resize
+        size: 64
+      - _target_: torchvision.transforms.Normalize
+        mean:
+        - 0.1
+        std:
+        - 0.2
+      - _target_: calvin_agent.utils.transforms.AddGaussianNoise
+        mean:
+        - 0.0
+        std:
+        - 0.01
+      robot_obs:
+      - _target_: calvin_agent.utils.transforms.NormalizeVector
+      - _target_: calvin_agent.utils.transforms.AddGaussianNoise
+        mean:
+        - 0.0
+        std:
+        - 0.01
+      scene_obs:
+      - _target_: calvin_agent.utils.transforms.NormalizeVector
+      - _target_: calvin_agent.utils.transforms.AddGaussianNoise
+        mean:
+        - 0.0
+        std:
+        - 0.01
+    val:
+      rgb_static:
+      - _target_: torchvision.transforms.Resize
+        size: 200
+      - _target_: calvin_agent.utils.transforms.ScaleImageTensor
+      - _target_: torchvision.transforms.Normalize
+        mean:
+        - 0.5
+        std:
+        - 0.5
+      rgb_gripper:
+      - _target_: torchvision.transforms.Resize
+        size: 84
+      - _target_: calvin_agent.utils.transforms.ScaleImageTensor
+      - _target_: torchvision.transforms.Normalize
+        mean:
+        - 0.5
+        std:
+        - 0.5
+      depth_static:
+      - _target_: torchvision.transforms.Resize
+        size: 200
+      depth_gripper:
+      - _target_: torchvision.transforms.Resize
+        size: 84
+      rgb_tactile:
+      - _target_: torchvision.transforms.Resize
+        size: 70
+      - _target_: torchvision.transforms.RandomCrop
+        size: 64
+      - _target_: calvin_agent.utils.transforms.ScaleImageTensor
+      - _target_: torchvision.transforms.Normalize
+        mean:
+        - 0.5
+        std:
+        - 0.5
+      depth_tactile:
+      - _target_: torchvision.transforms.Resize
+        size: 64
+      - _target_: torchvision.transforms.Normalize
+        mean:
+        - 0.1
+        std:
+        - 0.2
+      robot_obs:
+      - _target_: calvin_agent.utils.transforms.NormalizeVector
+      scene_obs:
+      - _target_: calvin_agent.utils.transforms.NormalizeVector
+  proprioception_dims:
+    n_state_obs: 8
+    keep_indices:
+    - - 0
+      - 7
+    - - 14
+      - 15
+    robot_orientation_idx:
+    - 3
+    - 6
+    normalize: true
+    normalize_robot_orientation: true
+  observation_space:
+    rgb_obs:
+    - rgb_static
+    depth_obs: []
+    state_obs:
+    - robot_obs
+    actions:
+    - actions
+    language:
+    - language
+  _target_: calvin_agent.datasets.calvin_data_module.CalvinDataModule
+  _recursive_: false
+  root_data_dir: /home/calvin/dataset/calvin_debug_dataset
+  action_space: 7
+  action_max:
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  action_min:
+  - -1.0
+  - -1.0
+  - -1.0
+  - -1.0
+  - -1.0
+  - -1.0
+  - -1
+  shuffle_val: false
+model:
+  perceptual_encoder:
+    vision_static:
+      _target_: calvin_agent.models.perceptual_encoders.vision_network.VisionNetwork
+      input_width: 200
+      input_height: 200
+      activation_function: ReLU
+      dropout_vis_fc: 0.0
+      l2_normalize_output: false
+      visual_features: 64
+      num_c: 3
+    vision_gripper: {}
+    depth_static: {}
+    depth_gripper: {}
+    proprio:
+      _target_: calvin_agent.models.perceptual_encoders.proprio_encoder.IdentityEncoder
+      proprioception_dims: ${datamodule.proprioception_dims}
+    tactile: {}
+    _target_: calvin_agent.models.perceptual_encoders.concat_encoders.ConcatEncoders
+    _recursive_: false
+  plan_proposal:
+    _target_: calvin_agent.models.plan_encoders.plan_proposal_net.PlanProposalNetwork
+    perceptual_features: ???
+    latent_goal_features: 32
+    plan_features: 256
+    activation_function: ReLU
+    min_std: 0.0001
+  plan_recognition:
+    _target_: calvin_agent.models.plan_encoders.plan_recognition_net.PlanRecognitionNetwork
+    in_features: ???
+    plan_features: 256
+    action_space: ${datamodule.action_space}
+    birnn_dropout_p: 0.0
+    min_std: 0.0001
+  visual_goal:
+    _target_: calvin_agent.models.encoders.goal_encoders.VisualGoalEncoder
+    in_features: ???
+    hidden_size: 2048
+    latent_goal_features: 32
+    l2_normalize_goal_embeddings: false
+    activation_function: ReLU
+  language_goal:
+    _target_: calvin_agent.models.encoders.goal_encoders.LanguageGoalEncoder
+    language_features: 384
+    hidden_size: 2048
+    latent_goal_features: 32
+    word_dropout_p: 0.0
+    l2_normalize_goal_embeddings: false
+    activation_function: ReLU
+  action_decoder:
+    _target_: calvin_agent.models.decoders.logistic_policy_network.LogisticPolicyNetwork
+    n_mixtures: 10
+    hidden_size: 2048
+    out_features: ${datamodule.action_space}
+    log_scale_min: -7.0
+    act_max_bound: ${datamodule.action_max}
+    act_min_bound: ${datamodule.action_min}
+    dataset_dir: ${datamodule.root_data_dir}
+    policy_rnn_dropout_p: 0.0
+    load_action_bounds: true
+    num_classes: 256
+    perceptual_features: ??
+    latent_goal_features: 32
+    plan_features: 256
+  optimizer:
+    _target_: torch.optim.Adam
+    lr: ${training.lr}
+  _target_: calvin_agent.models.mcil.MCIL
+  _recursive_: false
+  kl_beta: ${loss.kl_beta}
+  replan_freq: 30
+loss:
+  kl_beta: 0.001
+training:
+  lr: 0.0001
+trainer:
+  devices: 1
+  accelerator: gpu
+  precision: 16
+  val_check_interval: 1.0
+  max_epochs: 100
+logger:
+  _target_: pytorch_lightning.loggers.WandbLogger
+  save_dir: .
+  name: play_lmp
+  group: play_lmp
+  log_model: false
+  project: multi_play
+  id: ???
+seed: 42
+log_dir: ../
+slurm: false
+
+[2025-10-05 13:03:12,409][__main__][INFO] - Repo commit hash: fa03f01f19c65920e18cf37398a9ce859274af76
+[2025-10-05 13:03:12,459][__main__][INFO] - * CUDA:
+	- GPU:
+		- NVIDIA GeForce RTX 3090
+	- available:         True
+	- version:           11.7
+* Packages:
+	- numpy:             1.24.4
+	- pyTorch_debug:     False
+	- pyTorch_version:   1.13.1+cu117
+	- pytorch-lightning: 1.8.6
+	- tqdm:              4.67.1
+[2025-10-05 13:03:23,295][calvin_agent.datasets.utils.shared_memory_utils][INFO] - Loading train language episodes into shared memory. (progress bar shows only worker process 0).
+[2025-10-05 13:03:26,061][calvin_agent.datasets.utils.shared_memory_utils][INFO] - Loading val language episodes into shared memory. (progress bar shows only worker process 0).
+[2025-10-05 13:03:27,817][calvin_agent.datasets.base_dataset][INFO] - loading dataset at /home/calvin/dataset/calvin_debug_dataset/training
+[2025-10-05 13:03:27,818][calvin_agent.datasets.base_dataset][INFO] - finished loading dataset
+[2025-10-05 13:03:27,821][calvin_agent.datasets.base_dataset][INFO] - loading dataset at /home/calvin/dataset/calvin_debug_dataset/validation
+[2025-10-05 13:03:27,822][calvin_agent.datasets.base_dataset][INFO] - finished loading dataset
+[2025-10-05 13:03:27,826][calvin_agent.datasets.base_dataset][INFO] - loading dataset at /home/calvin/dataset/calvin_debug_dataset/training
+[2025-10-05 13:03:27,826][calvin_agent.datasets.base_dataset][INFO] - finished loading dataset
+[2025-10-05 13:03:27,830][calvin_agent.datasets.base_dataset][INFO] - loading dataset at /home/calvin/dataset/calvin_debug_dataset/validation
+[2025-10-05 13:03:27,831][calvin_agent.datasets.base_dataset][INFO] - finished loading dataset
+[2025-10-05 13:03:28,720][calvin_agent.models.mcil][INFO] - Start validation epoch 0
+[2025-10-05 13:03:30,766][calvin_agent.models.mcil][INFO] - Finished validation epoch 0
+[2025-10-05 13:03:30,774][calvin_agent.models.mcil][INFO] - Start training epoch 0
+[2025-10-05 13:04:29,702][calvin_agent.models.mcil][INFO] - Start validation epoch 0
+[2025-10-05 13:04:57,041][calvin_agent.models.mcil][INFO] - Finished validation epoch 0
+[2025-10-05 13:04:57,859][calvin_agent.models.mcil][INFO] - Finished training epoch 0
+[2025-10-05 13:04:57,861][calvin_agent.models.mcil][INFO] - Start training epoch 1
+[2025-10-05 13:05:57,889][calvin_agent.models.mcil][INFO] - Start validation epoch 1
+[2025-10-05 13:06:24,905][calvin_agent.models.mcil][INFO] - Finished validation epoch 1
+[2025-10-05 13:06:25,727][calvin_agent.models.mcil][INFO] - Finished training epoch 1
+[2025-10-05 13:06:25,730][calvin_agent.models.mcil][INFO] - Start training epoch 2
+[2025-10-05 13:07:24,149][calvin_agent.models.mcil][INFO] - Start validation epoch 2
+[2025-10-05 13:07:51,512][calvin_agent.models.mcil][INFO] - Finished validation epoch 2
+[2025-10-05 13:07:52,305][calvin_agent.models.mcil][INFO] - Finished training epoch 2
+[2025-10-05 13:07:52,307][calvin_agent.models.mcil][INFO] - Start training epoch 3
+[2025-10-05 13:08:51,240][calvin_agent.models.mcil][INFO] - Start validation epoch 3
+[2025-10-05 13:09:18,361][calvin_agent.models.mcil][INFO] - Finished validation epoch 3
+[2025-10-05 13:09:19,156][calvin_agent.models.mcil][INFO] - Finished training epoch 3
+[2025-10-05 13:09:19,159][calvin_agent.models.mcil][INFO] - Start training epoch 4
+[2025-10-05 13:10:19,344][calvin_agent.models.mcil][INFO] - Start validation epoch 4
+[2025-10-05 13:10:46,378][calvin_agent.models.mcil][INFO] - Finished validation epoch 4
+[2025-10-05 13:10:47,196][calvin_agent.models.mcil][INFO] - Finished training epoch 4
+[2025-10-05 13:10:47,198][calvin_agent.models.mcil][INFO] - Start training epoch 5
+[2025-10-05 13:11:46,736][calvin_agent.models.mcil][INFO] - Start validation epoch 5
+[2025-10-05 13:12:14,058][calvin_agent.models.mcil][INFO] - Finished validation epoch 5
+[2025-10-05 13:12:14,852][calvin_agent.models.mcil][INFO] - Finished training epoch 5
+[2025-10-05 13:12:14,854][calvin_agent.models.mcil][INFO] - Start training epoch 6
+[2025-10-05 13:13:14,187][calvin_agent.models.mcil][INFO] - Start validation epoch 6
+[2025-10-05 13:13:41,443][calvin_agent.models.mcil][INFO] - Finished validation epoch 6
+[2025-10-05 13:13:42,265][calvin_agent.models.mcil][INFO] - Finished training epoch 6
+[2025-10-05 13:13:42,267][calvin_agent.models.mcil][INFO] - Start training epoch 7
+[2025-10-05 13:14:41,421][calvin_agent.models.mcil][INFO] - Start validation epoch 7
+[2025-10-05 13:15:08,504][calvin_agent.models.mcil][INFO] - Finished validation epoch 7
+[2025-10-05 13:15:09,325][calvin_agent.models.mcil][INFO] - Finished training epoch 7
+[2025-10-05 13:15:09,327][calvin_agent.models.mcil][INFO] - Start training epoch 8
+[2025-10-05 13:16:08,959][calvin_agent.models.mcil][INFO] - Start validation epoch 8
+[2025-10-05 13:16:36,105][calvin_agent.models.mcil][INFO] - Finished validation epoch 8
+[2025-10-05 13:16:36,924][calvin_agent.models.mcil][INFO] - Finished training epoch 8
+[2025-10-05 13:16:36,927][calvin_agent.models.mcil][INFO] - Start training epoch 9
+[2025-10-05 13:17:36,687][calvin_agent.models.mcil][INFO] - Start validation epoch 9
+[2025-10-05 13:18:03,901][calvin_agent.models.mcil][INFO] - Finished validation epoch 9
+[2025-10-05 13:18:04,723][calvin_agent.models.mcil][INFO] - Finished training epoch 9
+[2025-10-05 13:18:04,725][calvin_agent.models.mcil][INFO] - Start training epoch 10
+[2025-10-05 13:19:04,586][calvin_agent.models.mcil][INFO] - Start validation epoch 10
+[2025-10-05 13:19:32,352][calvin_agent.models.mcil][INFO] - Finished validation epoch 10
+[2025-10-05 13:19:33,171][calvin_agent.models.mcil][INFO] - Finished training epoch 10
+[2025-10-05 13:19:33,173][calvin_agent.models.mcil][INFO] - Start training epoch 11
+[2025-10-05 13:20:32,725][calvin_agent.models.mcil][INFO] - Start validation epoch 11
+[2025-10-05 13:21:00,229][calvin_agent.models.mcil][INFO] - Finished validation epoch 11
+[2025-10-05 13:21:01,048][calvin_agent.models.mcil][INFO] - Finished training epoch 11
+[2025-10-05 13:21:01,051][calvin_agent.models.mcil][INFO] - Start training epoch 12
+[2025-10-05 13:22:01,506][calvin_agent.models.mcil][INFO] - Start validation epoch 12
+[2025-10-05 13:22:28,934][calvin_agent.models.mcil][INFO] - Finished validation epoch 12
+[2025-10-05 13:22:29,729][calvin_agent.models.mcil][INFO] - Finished training epoch 12
+[2025-10-05 13:22:29,731][calvin_agent.models.mcil][INFO] - Start training epoch 13
+[2025-10-05 13:23:28,695][calvin_agent.models.mcil][INFO] - Start validation epoch 13
+[2025-10-05 13:23:56,327][calvin_agent.models.mcil][INFO] - Finished validation epoch 13
+[2025-10-05 13:23:57,149][calvin_agent.models.mcil][INFO] - Finished training epoch 13
+[2025-10-05 13:23:57,151][calvin_agent.models.mcil][INFO] - Start training epoch 14
+[2025-10-05 13:24:56,382][calvin_agent.models.mcil][INFO] - Start validation epoch 14
+[2025-10-05 13:25:24,186][calvin_agent.models.mcil][INFO] - Finished validation epoch 14
+[2025-10-05 13:25:25,007][calvin_agent.models.mcil][INFO] - Finished training epoch 14
+[2025-10-05 13:25:25,009][calvin_agent.models.mcil][INFO] - Start training epoch 15
+[2025-10-05 13:26:25,033][calvin_agent.models.mcil][INFO] - Start validation epoch 15
+[2025-10-05 13:26:52,447][calvin_agent.models.mcil][INFO] - Finished validation epoch 15
+[2025-10-05 13:26:53,268][calvin_agent.models.mcil][INFO] - Finished training epoch 15
+[2025-10-05 13:26:53,270][calvin_agent.models.mcil][INFO] - Start training epoch 16
+[2025-10-05 13:27:52,186][calvin_agent.models.mcil][INFO] - Start validation epoch 16
+[2025-10-05 13:28:19,640][calvin_agent.models.mcil][INFO] - Finished validation epoch 16
+[2025-10-05 13:28:20,433][calvin_agent.models.mcil][INFO] - Finished training epoch 16
+[2025-10-05 13:28:20,435][calvin_agent.models.mcil][INFO] - Start training epoch 17
+[2025-10-05 13:29:19,965][calvin_agent.models.mcil][INFO] - Start validation epoch 17
+[2025-10-05 13:29:47,156][calvin_agent.models.mcil][INFO] - Finished validation epoch 17
+[2025-10-05 13:29:47,976][calvin_agent.models.mcil][INFO] - Finished training epoch 17
+[2025-10-05 13:29:47,978][calvin_agent.models.mcil][INFO] - Start training epoch 18
+[2025-10-05 13:30:47,625][calvin_agent.models.mcil][INFO] - Start validation epoch 18
+[2025-10-05 13:31:14,726][calvin_agent.models.mcil][INFO] - Finished validation epoch 18
+[2025-10-05 13:31:15,546][calvin_agent.models.mcil][INFO] - Finished training epoch 18
+[2025-10-05 13:31:15,549][calvin_agent.models.mcil][INFO] - Start training epoch 19
+[2025-10-05 13:32:14,730][calvin_agent.models.mcil][INFO] - Start validation epoch 19
+[2025-10-05 13:32:42,097][calvin_agent.models.mcil][INFO] - Finished validation epoch 19
+[2025-10-05 13:32:42,915][calvin_agent.models.mcil][INFO] - Finished training epoch 19
+[2025-10-05 13:32:42,918][calvin_agent.models.mcil][INFO] - Start training epoch 20
+[2025-10-05 13:33:41,906][calvin_agent.models.mcil][INFO] - Start validation epoch 20
+[2025-10-05 13:34:09,855][calvin_agent.models.mcil][INFO] - Finished validation epoch 20
+[2025-10-05 13:34:10,650][calvin_agent.models.mcil][INFO] - Finished training epoch 20
+[2025-10-05 13:34:10,653][calvin_agent.models.mcil][INFO] - Start training epoch 21
+[2025-10-05 13:35:09,397][calvin_agent.models.mcil][INFO] - Start validation epoch 21
+[2025-10-05 13:35:37,260][calvin_agent.models.mcil][INFO] - Finished validation epoch 21
+[2025-10-05 13:35:38,053][calvin_agent.models.mcil][INFO] - Finished training epoch 21
+[2025-10-05 13:35:38,056][calvin_agent.models.mcil][INFO] - Start training epoch 22
+[2025-10-05 13:36:37,680][calvin_agent.models.mcil][INFO] - Start validation epoch 22
+[2025-10-05 13:37:05,783][calvin_agent.models.mcil][INFO] - Finished validation epoch 22
+[2025-10-05 13:37:06,616][calvin_agent.models.mcil][INFO] - Finished training epoch 22
+[2025-10-05 13:37:06,619][calvin_agent.models.mcil][INFO] - Start training epoch 23
+[2025-10-05 13:38:07,256][calvin_agent.models.mcil][INFO] - Start validation epoch 23
+[2025-10-05 13:38:35,316][calvin_agent.models.mcil][INFO] - Finished validation epoch 23
+[2025-10-05 13:38:36,145][calvin_agent.models.mcil][INFO] - Finished training epoch 23
+[2025-10-05 13:38:36,148][calvin_agent.models.mcil][INFO] - Start training epoch 24
+[2025-10-05 13:39:36,340][calvin_agent.models.mcil][INFO] - Start validation epoch 24
+[2025-10-05 13:40:04,024][calvin_agent.models.mcil][INFO] - Finished validation epoch 24
+[2025-10-05 13:40:04,879][calvin_agent.models.mcil][INFO] - Finished training epoch 24
+[2025-10-05 13:40:04,881][calvin_agent.models.mcil][INFO] - Start training epoch 25
+[2025-10-05 13:41:04,860][calvin_agent.models.mcil][INFO] - Start validation epoch 25
+[2025-10-05 13:41:32,878][calvin_agent.models.mcil][INFO] - Finished validation epoch 25
+[2025-10-05 13:41:33,706][calvin_agent.models.mcil][INFO] - Finished training epoch 25
+[2025-10-05 13:41:33,708][calvin_agent.models.mcil][INFO] - Start training epoch 26
+[2025-10-05 13:42:33,145][calvin_agent.models.mcil][INFO] - Start validation epoch 26
+[2025-10-05 13:43:00,883][calvin_agent.models.mcil][INFO] - Finished validation epoch 26
+[2025-10-05 13:43:01,684][calvin_agent.models.mcil][INFO] - Finished training epoch 26
+[2025-10-05 13:43:01,686][calvin_agent.models.mcil][INFO] - Start training epoch 27
+[2025-10-05 13:44:02,245][calvin_agent.models.mcil][INFO] - Start validation epoch 27
+[2025-10-05 13:44:30,177][calvin_agent.models.mcil][INFO] - Finished validation epoch 27
+[2025-10-05 13:44:31,009][calvin_agent.models.mcil][INFO] - Finished training epoch 27
+[2025-10-05 13:44:31,012][calvin_agent.models.mcil][INFO] - Start training epoch 28
+[2025-10-05 13:45:30,850][calvin_agent.models.mcil][INFO] - Start validation epoch 28
+[2025-10-05 13:45:58,691][calvin_agent.models.mcil][INFO] - Finished validation epoch 28
+[2025-10-05 13:45:59,528][calvin_agent.models.mcil][INFO] - Finished training epoch 28
+[2025-10-05 13:45:59,530][calvin_agent.models.mcil][INFO] - Start training epoch 29
+[2025-10-05 13:46:59,931][calvin_agent.models.mcil][INFO] - Start validation epoch 29
+[2025-10-05 13:47:27,458][calvin_agent.models.mcil][INFO] - Finished validation epoch 29
+[2025-10-05 13:47:28,262][calvin_agent.models.mcil][INFO] - Finished training epoch 29
+[2025-10-05 13:47:28,264][calvin_agent.models.mcil][INFO] - Start training epoch 30
+[2025-10-05 13:48:28,795][calvin_agent.models.mcil][INFO] - Start validation epoch 30
+[2025-10-05 13:48:56,540][calvin_agent.models.mcil][INFO] - Finished validation epoch 30
+[2025-10-05 13:48:57,365][calvin_agent.models.mcil][INFO] - Finished training epoch 30
+[2025-10-05 13:48:57,368][calvin_agent.models.mcil][INFO] - Start training epoch 31
+[2025-10-05 13:49:57,694][calvin_agent.models.mcil][INFO] - Start validation epoch 31
+[2025-10-05 13:50:25,589][calvin_agent.models.mcil][INFO] - Finished validation epoch 31
+[2025-10-05 13:50:26,389][calvin_agent.models.mcil][INFO] - Finished training epoch 31
+[2025-10-05 13:50:26,391][calvin_agent.models.mcil][INFO] - Start training epoch 32
+[2025-10-05 13:51:27,182][calvin_agent.models.mcil][INFO] - Start validation epoch 32
+[2025-10-05 13:51:55,028][calvin_agent.models.mcil][INFO] - Finished validation epoch 32
+[2025-10-05 13:51:55,862][calvin_agent.models.mcil][INFO] - Finished training epoch 32
+[2025-10-05 13:51:55,864][calvin_agent.models.mcil][INFO] - Start training epoch 33
+[2025-10-05 13:52:56,665][calvin_agent.models.mcil][INFO] - Start validation epoch 33
+[2025-10-05 13:53:24,460][calvin_agent.models.mcil][INFO] - Finished validation epoch 33
+[2025-10-05 13:53:25,290][calvin_agent.models.mcil][INFO] - Finished training epoch 33
+[2025-10-05 13:53:25,292][calvin_agent.models.mcil][INFO] - Start training epoch 34
+[2025-10-05 13:54:25,427][calvin_agent.models.mcil][INFO] - Start validation epoch 34
+[2025-10-05 13:54:53,147][calvin_agent.models.mcil][INFO] - Finished validation epoch 34
+[2025-10-05 13:54:53,984][calvin_agent.models.mcil][INFO] - Finished training epoch 34
+[2025-10-05 13:54:53,986][calvin_agent.models.mcil][INFO] - Start training epoch 35
+[2025-10-05 13:55:54,288][calvin_agent.models.mcil][INFO] - Start validation epoch 35
+[2025-10-05 13:56:21,710][calvin_agent.models.mcil][INFO] - Finished validation epoch 35
+[2025-10-05 13:56:22,533][calvin_agent.models.mcil][INFO] - Finished training epoch 35
+[2025-10-05 13:56:22,535][calvin_agent.models.mcil][INFO] - Start training epoch 36
+[2025-10-05 13:57:22,857][calvin_agent.models.mcil][INFO] - Start validation epoch 36
+[2025-10-05 13:57:50,681][calvin_agent.models.mcil][INFO] - Finished validation epoch 36
+[2025-10-05 13:57:51,504][calvin_agent.models.mcil][INFO] - Finished training epoch 36
+[2025-10-05 13:57:51,507][calvin_agent.models.mcil][INFO] - Start training epoch 37
+[2025-10-05 13:58:52,419][calvin_agent.models.mcil][INFO] - Start validation epoch 37
+[2025-10-05 13:59:20,312][calvin_agent.models.mcil][INFO] - Finished validation epoch 37
+[2025-10-05 13:59:21,112][calvin_agent.models.mcil][INFO] - Finished training epoch 37
+[2025-10-05 13:59:21,114][calvin_agent.models.mcil][INFO] - Start training epoch 38
+[2025-10-05 14:00:21,239][calvin_agent.models.mcil][INFO] - Start validation epoch 38
+[2025-10-05 14:00:49,111][calvin_agent.models.mcil][INFO] - Finished validation epoch 38
+[2025-10-05 14:00:49,920][calvin_agent.models.mcil][INFO] - Finished training epoch 38
+[2025-10-05 14:00:49,923][calvin_agent.models.mcil][INFO] - Start training epoch 39
+[2025-10-05 14:01:50,325][calvin_agent.models.mcil][INFO] - Start validation epoch 39
+[2025-10-05 14:02:18,485][calvin_agent.models.mcil][INFO] - Finished validation epoch 39
+[2025-10-05 14:02:19,326][calvin_agent.models.mcil][INFO] - Finished training epoch 39
+[2025-10-05 14:02:19,329][calvin_agent.models.mcil][INFO] - Start training epoch 40
+[2025-10-05 14:03:19,155][calvin_agent.models.mcil][INFO] - Start validation epoch 40
+[2025-10-05 14:03:46,511][calvin_agent.models.mcil][INFO] - Finished validation epoch 40
+[2025-10-05 14:03:47,352][calvin_agent.models.mcil][INFO] - Finished training epoch 40
+[2025-10-05 14:03:47,354][calvin_agent.models.mcil][INFO] - Start training epoch 41
+[2025-10-05 14:04:47,497][calvin_agent.models.mcil][INFO] - Start validation epoch 41
+[2025-10-05 14:05:15,861][calvin_agent.models.mcil][INFO] - Finished validation epoch 41
+[2025-10-05 14:05:16,691][calvin_agent.models.mcil][INFO] - Finished training epoch 41
+[2025-10-05 14:05:16,694][calvin_agent.models.mcil][INFO] - Start training epoch 42
+[2025-10-05 14:06:16,754][calvin_agent.models.mcil][INFO] - Start validation epoch 42
+[2025-10-05 14:06:44,487][calvin_agent.models.mcil][INFO] - Finished validation epoch 42
+[2025-10-05 14:06:45,315][calvin_agent.models.mcil][INFO] - Finished training epoch 42
+[2025-10-05 14:06:45,317][calvin_agent.models.mcil][INFO] - Start training epoch 43
+[2025-10-05 14:07:46,168][calvin_agent.models.mcil][INFO] - Start validation epoch 43
+[2025-10-05 14:08:13,951][calvin_agent.models.mcil][INFO] - Finished validation epoch 43
+[2025-10-05 14:08:14,791][calvin_agent.models.mcil][INFO] - Finished training epoch 43
+[2025-10-05 14:08:14,793][calvin_agent.models.mcil][INFO] - Start training epoch 44
+[2025-10-05 14:09:15,349][calvin_agent.models.mcil][INFO] - Start validation epoch 44
+[2025-10-05 14:09:42,606][calvin_agent.models.mcil][INFO] - Finished validation epoch 44
+[2025-10-05 14:09:43,431][calvin_agent.models.mcil][INFO] - Finished training epoch 44
+[2025-10-05 14:09:43,434][calvin_agent.models.mcil][INFO] - Start training epoch 45
+[2025-10-05 14:10:43,732][calvin_agent.models.mcil][INFO] - Start validation epoch 45
+[2025-10-05 14:11:11,366][calvin_agent.models.mcil][INFO] - Finished validation epoch 45
+[2025-10-05 14:11:12,192][calvin_agent.models.mcil][INFO] - Finished training epoch 45
+[2025-10-05 14:11:12,195][calvin_agent.models.mcil][INFO] - Start training epoch 46
+[2025-10-05 14:12:11,877][calvin_agent.models.mcil][INFO] - Start validation epoch 46
+[2025-10-05 14:12:39,496][calvin_agent.models.mcil][INFO] - Finished validation epoch 46
+[2025-10-05 14:12:40,340][calvin_agent.models.mcil][INFO] - Finished training epoch 46
+[2025-10-05 14:12:40,343][calvin_agent.models.mcil][INFO] - Start training epoch 47
+[2025-10-05 14:13:41,038][calvin_agent.models.mcil][INFO] - Start validation epoch 47
+[2025-10-05 14:14:09,034][calvin_agent.models.mcil][INFO] - Finished validation epoch 47
+[2025-10-05 14:14:09,862][calvin_agent.models.mcil][INFO] - Finished training epoch 47
+[2025-10-05 14:14:09,864][calvin_agent.models.mcil][INFO] - Start training epoch 48
+[2025-10-05 14:15:10,434][calvin_agent.models.mcil][INFO] - Start validation epoch 48
+[2025-10-05 14:15:38,080][calvin_agent.models.mcil][INFO] - Finished validation epoch 48
+[2025-10-05 14:15:38,913][calvin_agent.models.mcil][INFO] - Finished training epoch 48
+[2025-10-05 14:15:38,915][calvin_agent.models.mcil][INFO] - Start training epoch 49
+[2025-10-05 14:16:39,367][calvin_agent.models.mcil][INFO] - Start validation epoch 49
+[2025-10-05 14:17:07,440][calvin_agent.models.mcil][INFO] - Finished validation epoch 49
+[2025-10-05 14:17:08,271][calvin_agent.models.mcil][INFO] - Finished training epoch 49
+[2025-10-05 14:17:08,274][calvin_agent.models.mcil][INFO] - Start training epoch 50
+[2025-10-05 14:18:08,264][calvin_agent.models.mcil][INFO] - Start validation epoch 50
+[2025-10-05 14:18:36,033][calvin_agent.models.mcil][INFO] - Finished validation epoch 50
+[2025-10-05 14:18:36,838][calvin_agent.models.mcil][INFO] - Finished training epoch 50
+[2025-10-05 14:18:36,840][calvin_agent.models.mcil][INFO] - Start training epoch 51
+[2025-10-05 14:19:38,182][calvin_agent.models.mcil][INFO] - Start validation epoch 51
+[2025-10-05 14:20:05,910][calvin_agent.models.mcil][INFO] - Finished validation epoch 51
+[2025-10-05 14:20:06,714][calvin_agent.models.mcil][INFO] - Finished training epoch 51
+[2025-10-05 14:20:06,716][calvin_agent.models.mcil][INFO] - Start training epoch 52
+[2025-10-05 14:21:06,290][calvin_agent.models.mcil][INFO] - Start validation epoch 52
+[2025-10-05 14:21:34,393][calvin_agent.models.mcil][INFO] - Finished validation epoch 52
+[2025-10-05 14:21:35,218][calvin_agent.models.mcil][INFO] - Finished training epoch 52
+[2025-10-05 14:21:35,221][calvin_agent.models.mcil][INFO] - Start training epoch 53
+[2025-10-05 14:22:34,343][calvin_agent.models.mcil][INFO] - Start validation epoch 53
+[2025-10-05 14:23:02,577][calvin_agent.models.mcil][INFO] - Finished validation epoch 53
+[2025-10-05 14:23:03,412][calvin_agent.models.mcil][INFO] - Finished training epoch 53
+[2025-10-05 14:23:03,415][calvin_agent.models.mcil][INFO] - Start training epoch 54
+[2025-10-05 14:24:04,317][calvin_agent.models.mcil][INFO] - Start validation epoch 54
+[2025-10-05 14:24:32,433][calvin_agent.models.mcil][INFO] - Finished validation epoch 54
+[2025-10-05 14:24:33,264][calvin_agent.models.mcil][INFO] - Finished training epoch 54
+[2025-10-05 14:24:33,267][calvin_agent.models.mcil][INFO] - Start training epoch 55
+[2025-10-05 14:25:33,526][calvin_agent.models.mcil][INFO] - Start validation epoch 55
+[2025-10-05 14:26:02,106][calvin_agent.models.mcil][INFO] - Finished validation epoch 55
+[2025-10-05 14:26:02,939][calvin_agent.models.mcil][INFO] - Finished training epoch 55
+[2025-10-05 14:26:02,942][calvin_agent.models.mcil][INFO] - Start training epoch 56
+[2025-10-05 14:27:03,693][calvin_agent.models.mcil][INFO] - Start validation epoch 56
+[2025-10-05 14:27:31,820][calvin_agent.models.mcil][INFO] - Finished validation epoch 56
+[2025-10-05 14:27:32,645][calvin_agent.models.mcil][INFO] - Finished training epoch 56
+[2025-10-05 14:27:32,647][calvin_agent.models.mcil][INFO] - Start training epoch 57
+[2025-10-05 14:28:33,096][calvin_agent.models.mcil][INFO] - Start validation epoch 57
+[2025-10-05 14:29:01,048][calvin_agent.models.mcil][INFO] - Finished validation epoch 57
+[2025-10-05 14:29:01,894][calvin_agent.models.mcil][INFO] - Finished training epoch 57
+[2025-10-05 14:29:01,897][calvin_agent.models.mcil][INFO] - Start training epoch 58
+[2025-10-05 14:30:03,119][calvin_agent.models.mcil][INFO] - Start validation epoch 58
+[2025-10-05 14:30:31,288][calvin_agent.models.mcil][INFO] - Finished validation epoch 58
+[2025-10-05 14:30:32,111][calvin_agent.models.mcil][INFO] - Finished training epoch 58
+[2025-10-05 14:30:32,113][calvin_agent.models.mcil][INFO] - Start training epoch 59
+[2025-10-05 14:31:32,999][calvin_agent.models.mcil][INFO] - Start validation epoch 59
+[2025-10-05 14:32:01,122][calvin_agent.models.mcil][INFO] - Finished validation epoch 59
+[2025-10-05 14:32:01,975][calvin_agent.models.mcil][INFO] - Finished training epoch 59
+[2025-10-05 14:32:01,978][calvin_agent.models.mcil][INFO] - Start training epoch 60
+[2025-10-05 14:33:02,795][calvin_agent.models.mcil][INFO] - Start validation epoch 60
+[2025-10-05 14:33:30,840][calvin_agent.models.mcil][INFO] - Finished validation epoch 60
+[2025-10-05 14:33:31,645][calvin_agent.models.mcil][INFO] - Finished training epoch 60
+[2025-10-05 14:33:31,648][calvin_agent.models.mcil][INFO] - Start training epoch 61
+[2025-10-05 14:34:31,733][calvin_agent.models.mcil][INFO] - Start validation epoch 61
+[2025-10-05 14:34:59,784][calvin_agent.models.mcil][INFO] - Finished validation epoch 61
+[2025-10-05 14:35:00,622][calvin_agent.models.mcil][INFO] - Finished training epoch 61
+[2025-10-05 14:35:00,624][calvin_agent.models.mcil][INFO] - Start training epoch 62
+[2025-10-05 14:36:00,871][calvin_agent.models.mcil][INFO] - Start validation epoch 62
+[2025-10-05 14:36:28,729][calvin_agent.models.mcil][INFO] - Finished validation epoch 62
+[2025-10-05 14:36:29,541][calvin_agent.models.mcil][INFO] - Finished training epoch 62
+[2025-10-05 14:36:29,543][calvin_agent.models.mcil][INFO] - Start training epoch 63
+[2025-10-05 14:37:31,448][calvin_agent.models.mcil][INFO] - Start validation epoch 63
+[2025-10-05 14:37:59,420][calvin_agent.models.mcil][INFO] - Finished validation epoch 63
+[2025-10-05 14:38:00,251][calvin_agent.models.mcil][INFO] - Finished training epoch 63
+[2025-10-05 14:38:00,253][calvin_agent.models.mcil][INFO] - Start training epoch 64
+[2025-10-05 14:39:01,596][calvin_agent.models.mcil][INFO] - Start validation epoch 64
+[2025-10-05 14:39:29,495][calvin_agent.models.mcil][INFO] - Finished validation epoch 64
+[2025-10-05 14:39:30,337][calvin_agent.models.mcil][INFO] - Finished training epoch 64
+[2025-10-05 14:39:30,339][calvin_agent.models.mcil][INFO] - Start training epoch 65
+[2025-10-05 14:40:31,357][calvin_agent.models.mcil][INFO] - Start validation epoch 65
+[2025-10-05 14:40:59,380][calvin_agent.models.mcil][INFO] - Finished validation epoch 65
+[2025-10-05 14:41:00,218][calvin_agent.models.mcil][INFO] - Finished training epoch 65
+[2025-10-05 14:41:00,220][calvin_agent.models.mcil][INFO] - Start training epoch 66
+[2025-10-05 14:42:01,299][calvin_agent.models.mcil][INFO] - Start validation epoch 66
+[2025-10-05 14:42:29,386][calvin_agent.models.mcil][INFO] - Finished validation epoch 66
+[2025-10-05 14:42:30,200][calvin_agent.models.mcil][INFO] - Finished training epoch 66
+[2025-10-05 14:42:30,201][calvin_agent.models.mcil][INFO] - Start training epoch 67
+[2025-10-05 14:43:30,761][calvin_agent.models.mcil][INFO] - Start validation epoch 67
+[2025-10-05 14:43:58,892][calvin_agent.models.mcil][INFO] - Finished validation epoch 67
+[2025-10-05 14:43:59,715][calvin_agent.models.mcil][INFO] - Finished training epoch 67
+[2025-10-05 14:43:59,717][calvin_agent.models.mcil][INFO] - Start training epoch 68
+[2025-10-05 14:45:00,177][calvin_agent.models.mcil][INFO] - Start validation epoch 68
+[2025-10-05 14:45:28,462][calvin_agent.models.mcil][INFO] - Finished validation epoch 68
+[2025-10-05 14:45:29,268][calvin_agent.models.mcil][INFO] - Finished training epoch 68
+[2025-10-05 14:45:29,271][calvin_agent.models.mcil][INFO] - Start training epoch 69
+[2025-10-05 14:46:30,646][calvin_agent.models.mcil][INFO] - Start validation epoch 69
+[2025-10-05 14:46:58,261][calvin_agent.models.mcil][INFO] - Finished validation epoch 69
+[2025-10-05 14:46:59,091][calvin_agent.models.mcil][INFO] - Finished training epoch 69
+[2025-10-05 14:46:59,094][calvin_agent.models.mcil][INFO] - Start training epoch 70
+[2025-10-05 14:47:59,432][calvin_agent.models.mcil][INFO] - Start validation epoch 70
+[2025-10-05 14:48:27,251][calvin_agent.models.mcil][INFO] - Finished validation epoch 70
+[2025-10-05 14:48:28,088][calvin_agent.models.mcil][INFO] - Finished training epoch 70
+[2025-10-05 14:48:28,090][calvin_agent.models.mcil][INFO] - Start training epoch 71
+[2025-10-05 14:49:28,529][calvin_agent.models.mcil][INFO] - Start validation epoch 71
+[2025-10-05 14:49:56,329][calvin_agent.models.mcil][INFO] - Finished validation epoch 71
+[2025-10-05 14:49:57,129][calvin_agent.models.mcil][INFO] - Finished training epoch 71
+[2025-10-05 14:49:57,132][calvin_agent.models.mcil][INFO] - Start training epoch 72
+[2025-10-05 14:50:58,008][calvin_agent.models.mcil][INFO] - Start validation epoch 72
+[2025-10-05 14:51:25,747][calvin_agent.models.mcil][INFO] - Finished validation epoch 72
+[2025-10-05 14:51:26,551][calvin_agent.models.mcil][INFO] - Finished training epoch 72
+[2025-10-05 14:51:26,553][calvin_agent.models.mcil][INFO] - Start training epoch 73
+[2025-10-05 14:52:27,867][calvin_agent.models.mcil][INFO] - Start validation epoch 73
+[2025-10-05 14:52:56,704][calvin_agent.models.mcil][INFO] - Finished validation epoch 73
+[2025-10-05 14:52:57,512][calvin_agent.models.mcil][INFO] - Finished training epoch 73
+[2025-10-05 14:52:57,514][calvin_agent.models.mcil][INFO] - Start training epoch 74
+[2025-10-05 14:53:58,112][calvin_agent.models.mcil][INFO] - Start validation epoch 74
+[2025-10-05 14:54:26,678][calvin_agent.models.mcil][INFO] - Finished validation epoch 74
+[2025-10-05 14:54:27,523][calvin_agent.models.mcil][INFO] - Finished training epoch 74
+[2025-10-05 14:54:27,525][calvin_agent.models.mcil][INFO] - Start training epoch 75
+[2025-10-05 14:55:28,687][calvin_agent.models.mcil][INFO] - Start validation epoch 75
+[2025-10-05 14:55:56,951][calvin_agent.models.mcil][INFO] - Finished validation epoch 75
+[2025-10-05 14:55:57,795][calvin_agent.models.mcil][INFO] - Finished training epoch 75
+[2025-10-05 14:55:57,798][calvin_agent.models.mcil][INFO] - Start training epoch 76
+[2025-10-05 14:57:00,045][calvin_agent.models.mcil][INFO] - Start validation epoch 76
+[2025-10-05 14:57:28,073][calvin_agent.models.mcil][INFO] - Finished validation epoch 76
+[2025-10-05 14:57:28,922][calvin_agent.models.mcil][INFO] - Finished training epoch 76
+[2025-10-05 14:57:28,924][calvin_agent.models.mcil][INFO] - Start training epoch 77
+[2025-10-05 14:58:29,050][calvin_agent.models.mcil][INFO] - Start validation epoch 77
+[2025-10-05 14:58:56,764][calvin_agent.models.mcil][INFO] - Finished validation epoch 77
+[2025-10-05 14:58:57,564][calvin_agent.models.mcil][INFO] - Finished training epoch 77
+[2025-10-05 14:58:57,566][calvin_agent.models.mcil][INFO] - Start training epoch 78
+[2025-10-05 14:59:58,720][calvin_agent.models.mcil][INFO] - Start validation epoch 78
+[2025-10-05 15:00:26,960][calvin_agent.models.mcil][INFO] - Finished validation epoch 78
+[2025-10-05 15:00:27,768][calvin_agent.models.mcil][INFO] - Finished training epoch 78
+[2025-10-05 15:00:27,770][calvin_agent.models.mcil][INFO] - Start training epoch 79
+[2025-10-05 15:01:27,879][calvin_agent.models.mcil][INFO] - Start validation epoch 79
+[2025-10-05 15:01:56,354][calvin_agent.models.mcil][INFO] - Finished validation epoch 79
+[2025-10-05 15:01:57,161][calvin_agent.models.mcil][INFO] - Finished training epoch 79
+[2025-10-05 15:01:57,163][calvin_agent.models.mcil][INFO] - Start training epoch 80
+[2025-10-05 15:02:58,378][calvin_agent.models.mcil][INFO] - Start validation epoch 80
+[2025-10-05 15:03:26,856][calvin_agent.models.mcil][INFO] - Finished validation epoch 80
+[2025-10-05 15:03:27,665][calvin_agent.models.mcil][INFO] - Finished training epoch 80
+[2025-10-05 15:03:27,667][calvin_agent.models.mcil][INFO] - Start training epoch 81
+[2025-10-05 15:04:28,285][calvin_agent.models.mcil][INFO] - Start validation epoch 81
+[2025-10-05 15:04:56,353][calvin_agent.models.mcil][INFO] - Finished validation epoch 81
+[2025-10-05 15:04:57,160][calvin_agent.models.mcil][INFO] - Finished training epoch 81
+[2025-10-05 15:04:57,162][calvin_agent.models.mcil][INFO] - Start training epoch 82
+[2025-10-05 15:05:57,900][calvin_agent.models.mcil][INFO] - Start validation epoch 82
+[2025-10-05 15:06:25,892][calvin_agent.models.mcil][INFO] - Finished validation epoch 82
+[2025-10-05 15:06:26,699][calvin_agent.models.mcil][INFO] - Finished training epoch 82
+[2025-10-05 15:06:26,702][calvin_agent.models.mcil][INFO] - Start training epoch 83
+[2025-10-05 15:07:26,828][calvin_agent.models.mcil][INFO] - Start validation epoch 83
+[2025-10-05 15:07:54,719][calvin_agent.models.mcil][INFO] - Finished validation epoch 83
+[2025-10-05 15:07:55,556][calvin_agent.models.mcil][INFO] - Finished training epoch 83
+[2025-10-05 15:07:55,557][calvin_agent.models.mcil][INFO] - Start training epoch 84
+[2025-10-05 15:08:56,928][calvin_agent.models.mcil][INFO] - Start validation epoch 84
+[2025-10-05 15:09:24,912][calvin_agent.models.mcil][INFO] - Finished validation epoch 84
+[2025-10-05 15:09:25,715][calvin_agent.models.mcil][INFO] - Finished training epoch 84
+[2025-10-05 15:09:25,717][calvin_agent.models.mcil][INFO] - Start training epoch 85
+[2025-10-05 15:10:25,242][calvin_agent.models.mcil][INFO] - Start validation epoch 85
+[2025-10-05 15:10:53,818][calvin_agent.models.mcil][INFO] - Finished validation epoch 85
+[2025-10-05 15:10:54,651][calvin_agent.models.mcil][INFO] - Finished training epoch 85
+[2025-10-05 15:10:54,653][calvin_agent.models.mcil][INFO] - Start training epoch 86
+[2025-10-05 15:11:55,756][calvin_agent.models.mcil][INFO] - Start validation epoch 86
+[2025-10-05 15:12:24,251][calvin_agent.models.mcil][INFO] - Finished validation epoch 86
+[2025-10-05 15:12:25,085][calvin_agent.models.mcil][INFO] - Finished training epoch 86
+[2025-10-05 15:12:25,088][calvin_agent.models.mcil][INFO] - Start training epoch 87
+[2025-10-05 15:13:24,937][calvin_agent.models.mcil][INFO] - Start validation epoch 87
+[2025-10-05 15:13:52,751][calvin_agent.models.mcil][INFO] - Finished validation epoch 87
+[2025-10-05 15:13:53,579][calvin_agent.models.mcil][INFO] - Finished training epoch 87
+[2025-10-05 15:13:53,581][calvin_agent.models.mcil][INFO] - Start training epoch 88
+[2025-10-05 15:14:55,038][calvin_agent.models.mcil][INFO] - Start validation epoch 88
+[2025-10-05 15:15:23,010][calvin_agent.models.mcil][INFO] - Finished validation epoch 88
+[2025-10-05 15:15:23,820][calvin_agent.models.mcil][INFO] - Finished training epoch 88
+[2025-10-05 15:15:23,822][calvin_agent.models.mcil][INFO] - Start training epoch 89
+[2025-10-05 15:16:24,012][calvin_agent.models.mcil][INFO] - Start validation epoch 89
+[2025-10-05 15:16:51,560][calvin_agent.models.mcil][INFO] - Finished validation epoch 89
+[2025-10-05 15:16:52,392][calvin_agent.models.mcil][INFO] - Finished training epoch 89
+[2025-10-05 15:16:52,394][calvin_agent.models.mcil][INFO] - Start training epoch 90
+[2025-10-05 15:17:53,009][calvin_agent.models.mcil][INFO] - Start validation epoch 90
+[2025-10-05 15:18:21,000][calvin_agent.models.mcil][INFO] - Finished validation epoch 90
+[2025-10-05 15:18:21,845][calvin_agent.models.mcil][INFO] - Finished training epoch 90
+[2025-10-05 15:18:21,847][calvin_agent.models.mcil][INFO] - Start training epoch 91
+[2025-10-05 15:19:22,762][calvin_agent.models.mcil][INFO] - Start validation epoch 91
+[2025-10-05 15:19:51,107][calvin_agent.models.mcil][INFO] - Finished validation epoch 91
+[2025-10-05 15:19:51,944][calvin_agent.models.mcil][INFO] - Finished training epoch 91
+[2025-10-05 15:19:51,946][calvin_agent.models.mcil][INFO] - Start training epoch 92
+[2025-10-05 15:20:52,399][calvin_agent.models.mcil][INFO] - Start validation epoch 92
+[2025-10-05 15:21:20,571][calvin_agent.models.mcil][INFO] - Finished validation epoch 92
+[2025-10-05 15:21:21,395][calvin_agent.models.mcil][INFO] - Finished training epoch 92
+[2025-10-05 15:21:21,397][calvin_agent.models.mcil][INFO] - Start training epoch 93
+[2025-10-05 15:22:21,916][calvin_agent.models.mcil][INFO] - Start validation epoch 93
+[2025-10-05 15:22:50,318][calvin_agent.models.mcil][INFO] - Finished validation epoch 93
+[2025-10-05 15:22:51,149][calvin_agent.models.mcil][INFO] - Finished training epoch 93
+[2025-10-05 15:22:51,152][calvin_agent.models.mcil][INFO] - Start training epoch 94
+[2025-10-05 15:23:51,675][calvin_agent.models.mcil][INFO] - Start validation epoch 94
+[2025-10-05 15:24:19,660][calvin_agent.models.mcil][INFO] - Finished validation epoch 94
+[2025-10-05 15:24:20,493][calvin_agent.models.mcil][INFO] - Finished training epoch 94
+[2025-10-05 15:24:20,496][calvin_agent.models.mcil][INFO] - Start training epoch 95
+[2025-10-05 15:25:21,583][calvin_agent.models.mcil][INFO] - Start validation epoch 95
+[2025-10-05 15:25:49,249][calvin_agent.models.mcil][INFO] - Finished validation epoch 95
+[2025-10-05 15:25:50,054][calvin_agent.models.mcil][INFO] - Finished training epoch 95
+[2025-10-05 15:25:50,056][calvin_agent.models.mcil][INFO] - Start training epoch 96
+[2025-10-05 15:26:50,357][calvin_agent.models.mcil][INFO] - Start validation epoch 96
+[2025-10-05 15:27:18,419][calvin_agent.models.mcil][INFO] - Finished validation epoch 96
+[2025-10-05 15:27:19,225][calvin_agent.models.mcil][INFO] - Finished training epoch 96
+[2025-10-05 15:27:19,227][calvin_agent.models.mcil][INFO] - Start training epoch 97
+[2025-10-05 15:28:20,158][calvin_agent.models.mcil][INFO] - Start validation epoch 97
+[2025-10-05 15:28:48,052][calvin_agent.models.mcil][INFO] - Finished validation epoch 97
+[2025-10-05 15:28:48,882][calvin_agent.models.mcil][INFO] - Finished training epoch 97
+[2025-10-05 15:28:48,884][calvin_agent.models.mcil][INFO] - Start training epoch 98
+[2025-10-05 15:29:48,889][calvin_agent.models.mcil][INFO] - Start validation epoch 98
+[2025-10-05 15:30:16,998][calvin_agent.models.mcil][INFO] - Finished validation epoch 98
+[2025-10-05 15:30:17,805][calvin_agent.models.mcil][INFO] - Finished training epoch 98
+[2025-10-05 15:30:17,807][calvin_agent.models.mcil][INFO] - Start training epoch 99
+[2025-10-05 15:31:19,434][calvin_agent.models.mcil][INFO] - Start validation epoch 99
+[2025-10-05 15:31:47,242][calvin_agent.models.mcil][INFO] - Finished validation epoch 99
+[2025-10-05 15:31:48,086][calvin_agent.models.mcil][INFO] - Finished training epoch 99
